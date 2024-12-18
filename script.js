@@ -1,6 +1,6 @@
 let isRunning = false;
-let interval = null;
-let bpmInterval = null;
+let nextTickTimeout = null;
+let bpmChangeInterval = null;
 
 const bpmDisplay = document.getElementById('bpm');
 const startStopButton = document.getElementById('start-stop');
@@ -11,6 +11,8 @@ const clickSound = document.getElementById('click');
 
 // Ensure the audio is loaded
 clickSound.load();
+
+let currentBPM = 60;
 
 // Function to generate a random BPM within the user-defined range
 function getRandomBPM() {
@@ -25,43 +27,48 @@ function getRandomBPM() {
     return Math.floor(Math.random() * (maxBPM - minBPM + 1)) + minBPM;
 }
 
-// Function to set BPM
-function setBPM(bpm) {
-    bpmDisplay.textContent = bpm;
-    if (isRunning) {
-        clearInterval(interval);
-        startMetronome(bpm);
-    }
+// Function to play a single tick
+function playTick() {
+    clickSound.currentTime = 0;
+    clickSound.play().catch((error) => console.error('Audio playback error:', error));
+
+    // Schedule the next tick based on the current BPM
+    const intervalTime = 60000 / currentBPM; // Convert BPM to milliseconds
+    nextTickTimeout = setTimeout(playTick, intervalTime);
 }
 
-// Function to start the metronome
-function startMetronome(bpm) {
-    const intervalTime = 60000 / bpm; // Convert BPM to milliseconds
-    interval = setInterval(() => {
-        clickSound.currentTime = 0; // Reset audio to the beginning
-        clickSound.play().catch(error => console.error('Audio playback error:', error));
-    }, intervalTime);
-}
+// Function to handle BPM changes without pausing the rhythm
+function handleBPMChange() {
+    const duration = parseInt(durationSelect.value, 10); // Get user-selected duration in milliseconds
 
-// Function to randomize BPM while playing
-function startRandomizingBPM() {
-    const duration = parseInt(durationSelect.value, 10); // Get the user-selected duration
-    bpmInterval = setInterval(() => {
-        const randomBPM = getRandomBPM();
-        setBPM(randomBPM);
+    // Clear any previous BPM change interval
+    clearInterval(bpmChangeInterval);
+
+    // Start a new interval for BPM changes
+    bpmChangeInterval = setInterval(() => {
+        const newBPM = getRandomBPM();
+
+        // Update BPM smoothly without interrupting the rhythm
+        currentBPM = newBPM;
+        bpmDisplay.textContent = currentBPM;
     }, duration);
 }
 
-// Toggle start/stop
+// Toggle start/stop functionality
 startStopButton.addEventListener('click', () => {
     if (isRunning) {
-        clearInterval(interval);
-        clearInterval(bpmInterval);
+        // Stop the metronome
+        clearTimeout(nextTickTimeout);
+        clearInterval(bpmChangeInterval);
         startStopButton.textContent = 'Start';
     } else {
-        const initialBPM = getRandomBPM();
-        setBPM(initialBPM);
-        startRandomizingBPM();
+        // Initialize BPM and start the metronome
+        currentBPM = getRandomBPM();
+        bpmDisplay.textContent = currentBPM;
+
+        // Start the metronome and BPM change logic
+        playTick();
+        handleBPMChange();
         startStopButton.textContent = 'Stop';
     }
     isRunning = !isRunning;
